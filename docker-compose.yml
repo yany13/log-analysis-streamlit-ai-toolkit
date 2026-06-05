@@ -1,0 +1,54 @@
+services:
+
+  ollama-local:
+    build:
+      context: .
+      dockerfile: ./docker/ollama-local/Dockerfile
+    container_name: log-analysis-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - log-analysis-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  streamlit-app:
+    build:
+      context: .
+      dockerfile: ./docker/streamlit-app/Dockerfile
+    container_name: log-analysis-streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./db_logs:/app/db_logs
+      - ./db_kb:/app/db_kb
+      - ./logs:/app/logs
+    environment:
+      - OLLAMA_URL=http://ollama-local:11434
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      ollama-local:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - log-analysis-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  ollama_data:
+
+networks:
+  log-analysis-network:
+    driver: bridge

@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Database
+db_logs/
+db_kb/
+
+# Node
+node_modules/
+
+# Env
+.env
+.env.local
+
+# Docker
+docker/
+docker-compose.yml
+Dockerfile
