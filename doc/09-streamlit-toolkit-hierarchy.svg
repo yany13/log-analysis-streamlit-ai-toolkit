@@ -1,0 +1,161 @@
+<svg viewBox="0 0 1400 1100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font-size: 28px; font-weight: bold; fill: #1a1a1a; }
+      .section-title { font-size: 16px; font-weight: bold; fill: #1a1a1a; }
+      .label { font-size: 12px; fill: #333; }
+      .small-label { font-size: 10px; fill: #666; }
+      .box { stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="1100" fill="#f8f9fa"/>
+
+  <!-- Title Section -->
+  <text x="700" y="45" class="title" text-anchor="middle">Streamlit Toolkit Service Hierarchy</text>
+  <text x="700" y="75" font-size="14" text-anchor="middle" fill="#666">
+    log-analysis-streamlit-ai-toolkit (Parent) → Orchestrates UI and Analytics Services
+  </text>
+
+  <!-- Parent Service Container -->
+  <g>
+    <rect x="350" y="110" width="700" height="180" rx="8" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
+
+    <!-- Parent icon - Streamlit -->
+    <rect x="375" y="130" width="50" height="50" rx="4" fill="#f57c00"/>
+    <text x="400" y="162" font-size="20" text-anchor="middle" fill="#fff" font-weight="bold">ST</text>
+
+    <!-- Parent info -->
+    <text x="450" y="145" font-size="16" font-weight="bold" fill="#1a1a1a">log-analysis-streamlit-ai-toolkit</text>
+    <text x="450" y="165" font-size="11" fill="#333">Streamlit Toolkit &amp; Analytics Services</text>
+    <text x="450" y="182" font-size="10" fill="#666">Python 3.11 + Streamlit + Analytics</text>
+    <text x="450" y="198" font-size="10" fill="#666">Status: Running | CPU: 0.89% | Memory: 784.1MB</text>
+    <text x="450" y="214" font-size="10" fill="#666">Provides interactive dashboards and data visualization</text>
+    <text x="450" y="237" font-size="9" fill="#999" font-style="italic">Depends On: Main API + Ollama + Log Analysis Services</text>
+  </g>
+
+  <!-- Dependency lines from parent -->
+  <line x1="400" y1="290" x2="400" y2="350" stroke="#f57c00" stroke-width="2"/>
+  <line x1="700" y1="290" x2="700" y2="350" stroke="#f57c00" stroke-width="2"/>
+  <line x1="1000" y1="290" x2="1000" y2="350" stroke="#f57c00" stroke-width="2"/>
+
+  <!-- SERVICE 1: Log Analysis API (left) -->
+  <g>
+    <rect x="250" y="350" width="400" height="200" rx="8" fill="#e8f5e9" stroke="#22c55e" stroke-width="2"/>
+
+    <!-- Service icon -->
+    <rect x="270" y="370" width="50" height="50" rx="4" fill="#22c55e"/>
+    <text x="295" y="402" font-size="20" text-anchor="middle" fill="#fff" font-weight="bold">API</text>
+
+    <text x="330" y="387" font-size="14" font-weight="bold" fill="#1a1a1a">log-analysis-ai-usecase-app</text>
+    <text x="330" y="405" font-size="11" fill="#666">FastAPI Backend</text>
+
+    <text x="270" y="442" font-size="9" fill="#333">Container ID: (compose)</text>
+    <text x="270" y="458" font-size="9" fill="#333">Port: Internal API Gateway</text>
+    <text x="270" y="474" font-size="9" fill="#333">CPU: 2.11% | Memory: 383.48MB</text>
+    <text x="270" y="490" font-size="9" fill="#333">Python 3.11 + FastAPI + Uvicorn</text>
+    <text x="270" y="506" font-size="9" fill="#333">Network: log-analysis-net</text>
+
+    <text x="270" y="535" font-size="8" fill="#666" font-weight="bold">Service: main-api-backend</text>
+  </g>
+
+  <!-- SERVICE 2: Ollama LLM (center) -->
+  <g>
+    <rect x="550" y="350" width="400" height="200" rx="8" fill="#e0f2f1" stroke="#00897b" stroke-width="2"/>
+
+    <!-- Service icon -->
+    <rect x="570" y="370" width="50" height="50" rx="4" fill="#00897b"/>
+    <text x="595" y="402" font-size="18" text-anchor="middle" fill="#fff" font-weight="bold">LLM</text>
+
+    <text x="630" y="387" font-size="14" font-weight="bold" fill="#1a1a1a">log-analysis-ollama</text>
+    <text x="630" y="405" font-size="11" fill="#666">Ollama LLM Runtime</text>
+
+    <text x="570" y="442" font-size="9" fill="#333">Container ID: 7ca0d8dad5ad</text>
+    <text x="570" y="458" font-size="9" fill="#333">Port: 11434:11434</text>
+    <text x="570" y="474" font-size="9" fill="#333">CPU: 0.65% | Memory: 182.7MB</text>
+    <text x="570" y="490" font-size="9" fill="#333">Ollama + Local LLM Models</text>
+    <text x="570" y="506" font-size="9" fill="#333">Network: log-analysis-net</text>
+
+    <text x="570" y="535" font-size="8" fill="#666" font-weight="bold">Service: llm-inference-engine</text>
+  </g>
+
+  <!-- SERVICE 3: Main Streamlit (right) -->
+  <g>
+    <rect x="850" y="350" width="400" height="200" rx="8" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2"/>
+
+    <!-- Service icon -->
+    <rect x="870" y="370" width="50" height="50" rx="4" fill="#7b1fa2"/>
+    <text x="895" y="402" font-size="18" text-anchor="middle" fill="#fff" font-weight="bold">WEB</text>
+
+    <text x="930" y="387" font-size="14" font-weight="bold" fill="#1a1a1a">log-analysis-streamlit</text>
+    <text x="930" y="405" font-size="11" fill="#666">Main Web Interface</text>
+
+    <text x="870" y="442" font-size="9" fill="#333">Container ID: 81f93afe71a9</text>
+    <text x="870" y="458" font-size="9" fill="#333">Port: 8501:8501</text>
+    <text x="870" y="474" font-size="9" fill="#333">CPU: 0.24% | Memory: 601.4MB</text>
+    <text x="870" y="490" font-size="9" fill="#333">Streamlit + Python Web App</text>
+    <text x="870" y="506" font-size="9" fill="#333">Network: log-analysis-net</text>
+
+    <text x="870" y="535" font-size="8" fill="#666" font-weight="bold">Service: analytics-web-interface</text>
+  </g>
+
+  <!-- Child Service Relationship Section -->
+  <text x="700" y="610" class="section-title" text-anchor="middle">Service Dependencies and Communication Flows</text>
+
+  <!-- Dependency table -->
+  <g>
+    <!-- Table header -->
+    <rect x="50" y="630" width="1300" height="35" fill="#ffe0b2" stroke="#f57c00" stroke-width="2"/>
+    <text x="70" y="654" font-size="11" font-weight="bold" fill="#1a1a1a">Parent Service</text>
+    <text x="350" y="654" font-size="11" font-weight="bold" fill="#1a1a1a">Dependent Service</text>
+    <text x="700" y="654" font-size="11" font-weight="bold" fill="#1a1a1a">Purpose</text>
+    <text x="1050" y="654" font-size="11" font-weight="bold" fill="#1a1a1a">Status</text>
+
+    <!-- Row 1: API -->
+    <rect x="50" y="665" width="1300" height="40" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+    <text x="70" y="688" font-size="10" fill="#333">log-analysis-streamlit-ai-toolkit</text>
+    <text x="350" y="688" font-size="10" fill="#333">log-analysis-ai-usecase-app</text>
+    <text x="700" y="688" font-size="10" fill="#333">Backend API + Log Processing</text>
+    <circle cx="1070" cy="685" r="4" fill="#10b981"/>
+    <text x="1090" y="688" font-size="10" fill="#333">Running</text>
+
+    <!-- Row 2: Ollama -->
+    <rect x="50" y="705" width="1300" height="40" fill="#fff" stroke="#ccc" stroke-width="1"/>
+    <text x="70" y="728" font-size="10" fill="#333">log-analysis-streamlit-ai-toolkit</text>
+    <text x="350" y="728" font-size="10" fill="#333">log-analysis-ollama</text>
+    <text x="700" y="728" font-size="10" fill="#333">LLM Inference + AI Analysis</text>
+    <circle cx="1070" cy="725" r="4" fill="#10b981"/>
+    <text x="1090" y="728" font-size="10" fill="#333">Running</text>
+
+    <!-- Row 3: Streamlit Web -->
+    <rect x="50" y="745" width="1300" height="40" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+    <text x="70" y="768" font-size="10" fill="#333">log-analysis-streamlit-ai-toolkit</text>
+    <text x="350" y="768" font-size="10" fill="#333">log-analysis-streamlit</text>
+    <text x="700" y="768" font-size="10" fill="#333">UI Rendering + User Interactions</text>
+    <circle cx="1070" cy="765" r="4" fill="#10b981"/>
+    <text x="1090" y="768" font-size="10" fill="#333">Running</text>
+  </g>
+
+  <!-- Network Configuration -->
+  <g>
+    <text x="70" y="810" font-size="11" font-weight="bold" fill="#1a1a1a">Network Configuration:</text>
+    <text x="70" y="830" font-size="10" fill="#333">• Primary Network: log-analysis-net (bridge)</text>
+    <text x="500" y="830" font-size="10" fill="#333">• All services connected for data flow and API communication</text>
+    <text x="70" y="850" font-size="9" fill="#999" font-style="italic">Configuration: docker-compose.yml | Streamlit toolkit orchestrates UI, API, and LLM services</text>
+  </g>
+
+  <!-- Legend -->
+  <g>
+    <text x="70" y="885" font-size="11" font-weight="bold" fill="#1a1a1a">Legend:</text>
+    <circle cx="85" cy="905" r="3" fill="#10b981"/>
+    <text x="100" y="908" font-size="10" fill="#333">Active service</text>
+    <rect x="280" y="898" width="12" height="12" rx="2" fill="#f57c00"/>
+    <text x="300" y="908" font-size="10" fill="#333">Streamlit Toolkit (Parent)</text>
+    <rect x="520" y="898" width="12" height="12" rx="2" fill="#22c55e"/>
+    <text x="540" y="908" font-size="10" fill="#333">API service</text>
+    <rect x="760" y="898" width="12" height="12" rx="2" fill="#00897b"/>
+    <text x="780" y="908" font-size="10" fill="#333">LLM service</text>
+    <rect x="1000" y="898" width="12" height="12" rx="2" fill="#7b1fa2"/>
+    <text x="1020" y="908" font-size="10" fill="#333">Web interface service</text>
+  </g>
+</svg>
