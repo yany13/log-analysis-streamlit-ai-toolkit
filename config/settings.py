@@ -18,8 +18,8 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 # Default models
 OLLAMA_MODELS = {
-    "expert_rca": "gemma3:4b",
-    "log_summary": "llama3.2",
+    "expert_rca": "llama3:latest",
+    "log_summary": "llama3.2:latest",
 }
 
 OPENAI_MODELS = {

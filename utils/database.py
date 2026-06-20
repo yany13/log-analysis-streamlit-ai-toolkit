@@ -14,7 +14,7 @@ def get_chroma_client(path):
     )
 
 
-@st.cache_data(ttl=30)
+#@st.cache_data(ttl=30)
 def get_vector_store(path, embed_fn, col_name):
     """Get or create a vector store (Chroma + LangChain)."""
     client = get_chroma_client(path)
