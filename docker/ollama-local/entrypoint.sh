@@ -17,6 +17,8 @@ MODELS=(
     "llama3.2:latest"                     # Stable, widely-used
     "nomic-embed-text:latest"             # Stable embedding model
     "llama3:latest"                       # Fallback option
+    "qwen3.5:latest"                      # Qwen 3 (14B variant)
+    "gemma4:latest"                          # Gemma 4 early version
 )
 
 # Pull models if they don't already exist

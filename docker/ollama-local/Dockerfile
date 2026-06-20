@@ -1,4 +1,4 @@
-FROM ollama/ollama:0.4.7
+FROM ollama/ollama:0.30.10
 
 # Install curl for health checks and bash for entrypoint script
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*

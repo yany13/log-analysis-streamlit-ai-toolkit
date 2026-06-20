@@ -3,14 +3,14 @@ from fpdf import FPDF
 
 
 def clean_unicode(text):
-    """Convert unicode characters to ASCII equivalents."""
+    """Convert unicode characters to Latin-1 compatible equivalents."""
     replacements = {
         '–': '-',
         '—': '-',
-        '‘': "'",
-        '’': "'",
-        '“': '"',
-        '”': '"',
+        ''': "'",
+        ''': "'",
+        '"': '"',
+        '"': '"',
         '•': '*',
         '…': '...'
     }
@@ -40,7 +40,7 @@ def create_pdf_report(rca_text, query):
     # Query
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
-    pdf.multi_cell(0, 10, clean_unicode(f"Incident Query: {query}"))
+    pdf.multi_cell(0, 10, clean_unicode(f"Incident Query: {query}"), align='C')
 
     # Body
     pdf.ln(5)
@@ -48,4 +48,4 @@ def create_pdf_report(rca_text, query):
     body_text = str(rca_text).replace("**", "").replace("__", "").replace("###", "")
     pdf.multi_cell(0, 10, clean_unicode(body_text))
 
-    return bytes(pdf.output(dest='S'))
+    return pdf.output(dest='S')
