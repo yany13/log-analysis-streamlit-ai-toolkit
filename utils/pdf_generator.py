@@ -48,4 +48,7 @@ def create_pdf_report(rca_text, query):
     body_text = str(rca_text).replace("**", "").replace("__", "").replace("###", "")
     pdf.multi_cell(0, 10, clean_unicode(body_text))
 
-    return pdf.output(dest='S')
+    pdf_output = pdf.output(dest='S')
+    if isinstance(pdf_output, str):
+        return pdf_output.encode('latin-1')
+    return bytes(pdf_output)

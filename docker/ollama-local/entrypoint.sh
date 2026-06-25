@@ -12,13 +12,15 @@ done
 echo "✓ Ollama server is ready"
 
 # Array of models to pull
-# Using stable models known to work with Ollama 0.4.7
+# Using stable models known to work with Ollama 0.30.10
 MODELS=(
     "llama3.2:latest"                     # Stable, widely-used
     "nomic-embed-text:latest"             # Stable embedding model
     "llama3:latest"                       # Fallback option
     "qwen3.5:latest"                      # Qwen 3 (14B variant)
-    "gemma4:latest"                          # Gemma 4 early version
+    "gemma4:latest"                       # Gemma 4 early version
+    "qwen2.5:32b"                         # RAG in-depth (better reasoning for RCA)
+    "mistral:7b"                          # Quick analysis (faster summaries)
 )
 
 # Pull models if they don't already exist
