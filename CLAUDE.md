@@ -1,9 +1,32 @@
-# System Directive: Log Analysis AI Toolkit (CLAUDE.md)
+# System Directive: Log Analysis AI Toolkit
 
 **Role**: AI Agent & RAG System Developer  
 **Target Audience**: Backend Engineers, ML Engineers, DevOps (building AI-assisted diagnostics)  
 **User Persona**: ML/Backend architect (Prefers architecture-first, robust validation, measurable accuracy)  
-**Current Date Context**: June 2026  
+**Current Date Context**: June 2026
+
+**Status**: v1.0.0 (Core RAG pipeline complete; structured output & testing in progress)
+
+---
+
+## 📌 Implementation Status
+
+### ✅ Complete
+- RAG pipeline: retrieval + augmentation + generation
+- Multi-provider support (Ollama, OpenAI, Hugging Face)
+- ChromaDB vector storage for logs and knowledge base
+- Log ingestion with timestamp extraction
+- Semantic search (hybrid: exact match + fallback to embedding-based)
+- Web search integration (DuckDuckGo)
+- PDF report export
+- Docker deployment with health checks
+
+### ⚠️ In Progress / Gaps
+- **Structured LLM output** — Currently returns raw text; need JSON parsing for confidence, evidence, remediation
+- **Sample knowledge base** — `data/sample_kb/` is empty; needs 5 runbooks (db_leak, ldap_timeout, oom, deadlock, ssl)
+- **Test framework** — No integration tests against ByteBite failures
+- **Retrieval tuning** — Chunk size (1000) and similarity threshold (0.15) are defaults; need per-failure-type optimization
+- **Prompt engineering** — Current prompt is generic; needs structured reasoning and chain-of-thought guidance
 
 ---
 
@@ -56,6 +79,34 @@ The Streamlit Toolkit is an AI Agent that diagnoses production failures:
 
 ---
 
+## 🏗️ Architecture & Implementation
+
+### Current Stack
+- **Frontend**: Streamlit 1.55.0 (3 tabs: Log Analysis, Knowledge Base, Maintenance)
+- **Vector DB**: ChromaDB 1.5.5 (persistent, local, two collections: logs & KB)
+- **LLM Backends**: LangChain abstractions for Ollama/OpenAI/HuggingFace
+- **Embeddings**: Multi-provider (Ollama, OpenAI, HuggingFace)
+- **Deployment**: Docker Compose with health checks
+
+### Key Files & Responsibilities
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `app.py` | Streamlit entry point, tab orchestration | ✅ Complete |
+| `components/sidebar.py` | LLM/embedding config UI | ✅ Complete |
+| `components/log_analysis_tab.py` | RCA workflow (ingest → search → analyze) | ⚠️ Output parsing needed |
+| `components/knowledge_base_tab.py` | KB file upload & chunking | ✅ Complete |
+| `components/maintenance_tab.py` | Database management UI | ✅ Complete |
+| `utils/database.py` | ChromaDB operations | ✅ Complete |
+| `utils/embeddings.py` | Embedding factory | ✅ Complete |
+| `utils/llm_engines.py` | LLM factory + provider abstraction | ✅ Complete |
+| `utils/search.py` | DuckDuckGo web search wrapper | ✅ Complete |
+| `utils/pdf_generator.py` | PDF report generation | ✅ Complete |
+| `config/settings.py` | Constants & defaults | ⚠️ Tuning parameters needed |
+| `data/sample_kb/` | Knowledge base runbooks | ❌ Empty (populate with 5 KB docs) |
+
+---
+
 ## 🧠 Architecture & Design Principles
 
 ### Retrieval-Augmented Generation (RAG)
@@ -77,28 +128,77 @@ The knowledge base should include:
 
 **Tagging strategy**: Tag by failure type (db_leak, ldap_timeout, oom, deadlock, ssl) so semantic search can find relevant context.
 
+### Retrieval Tuning Parameters
+
+Current defaults (in `config/settings.py`):
+```python
+CHUNK_SIZE = 1000          # Log/KB chunk size (bytes)
+CHUNK_OVERLAP = 100        # Overlap between chunks
+SIMILARITY_THRESHOLD = 0.15  # Min embedding similarity
+MAX_SEARCH_RESULTS = 10    # Top-K results to retrieve
+```
+
+**Optimization strategy**:
+- **For db_leak**: Tune to capture "Available connections: X" patterns → may need smaller chunks (500-700 chars)
+- **For deadlock**: Need larger context (thread dumps are verbose) → 1500+ chars
+- **For ldap_timeout**: Threshold may need raising (0.25+) to reduce noise
+- **For oom**: OOM stack traces are distinctive; standard settings should work
+
 ### Prompting Strategy
 
-Prompts must:
-1. **Include actual log excerpts** (not descriptions)
-2. **Ask for structured reasoning** (symptoms → hypothesis → validation)
-3. **Request confidence scores** (0-100%, with uncertainty explanation)
-4. **Demand evidence** (which log lines support this conclusion?)
+**Current state**: Generic prompt in `log_analysis_tab.py` line 168-173  
+**Needed**: Structured prompt requesting JSON output
 
-**Example**:
+Target prompt structure:
+```python
+prompt = f"""
+Diagnose the root cause from these logs and knowledge base context.
+
+LOGS (Top-K most relevant):
+{log_context}
+
+KNOWLEDGE BASE (Runbooks & past solutions):
+{kb_context}
+
+EXTERNAL CONTEXT:
+{web_context}
+
+ANALYSIS INSTRUCTIONS:
+1. Identify symptoms (what log entries indicate problems?)
+2. Form hypothesis (which failure type matches the symptoms?)
+3. Rate confidence 0-100%:
+   - 95-100%: Clear evidence, distinctive error messages
+   - 80-94%: Strong indicators but some ambiguity
+   - 60-79%: Multiple plausible causes
+   - <60%: Insufficient evidence
+4. List evidence (specific log lines that support this conclusion)
+5. Explain uncertainty (what could change this diagnosis?)
+6. Recommend remediation steps
+
+Return ONLY valid JSON:
+{{
+  "root_cause": "...",
+  "confidence": 0.95,
+  "confidence_reasoning": "...",
+  "evidence": ["log excerpt 1", "log excerpt 2"],
+  "uncertainty": "...",
+  "remediation": ["step 1", "step 2"]
+}}
+"""
 ```
-Given these log excerpts:
-[LOGS HERE]
 
-And this context from the knowledge base:
-[KB CONTEXT HERE]
-
-Diagnose the root cause. For each hypothesis:
-1. State the symptom you observe
-2. Explain why this indicates root cause X
-3. Point to specific log evidence
-4. Rate confidence 0-100%
-5. Explain any uncertainty
+**Implementation note**: After calling LLM, parse response with:
+```python
+def parse_rca_response(llm_text):
+    """Extract JSON from LLM response, fallback to raw text."""
+    try:
+        import json
+        json_match = re.search(r'\{.*\}', llm_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+    except:
+        pass
+    return {"raw_response": llm_text, "confidence": 0.0, "parsed": False}
 ```
 
 ---
@@ -156,25 +256,30 @@ Refer to or modify:
 
 ## 🔍 Validation & Confidence Scoring
 
-### How Agents Report Confidence
+### Target Output Format (WIP)
 
-Agents must output:
+The RCA should output structured JSON:
 ```json
 {
   "root_cause": "Connection pool exhaustion in HikariCP",
   "confidence": 0.95,
-  "uncertainty_explanation": "Clear evidence in logs, but could be coincident with network issue",
+  "confidence_reasoning": "Clear HikariCP messages + persistent 'Available connections: 0' pattern in logs",
   "evidence": [
-    "Log line 42: 'Available connections: 0'",
-    "Log line 67: 'Connection not available, timeout after 30s'"
+    "Available connections: 0 (line 2847)",
+    "Connection not available, timeout after 30000ms (line 2852)",
+    "MenuServlet making repeated DB calls without closing (code review)"
   ],
+  "uncertainty": "Could be coincident with network latency; need to confirm connection closure code",
   "remediation": [
-    "1. Restart service to reset connection pool",
-    "2. Code review: find unclosed connection in MenuServlet",
-    "3. Add try-with-resources to ensure cleanup"
+    "1. Restart service to reset connection pool (immediate)",
+    "2. Code review: find unclosed connection in MenuServlet (urgent)",
+    "3. Add try-with-resources or finally block to ensure cleanup (fix)",
+    "4. Add monitoring for available connections < 5 (prevention)"
   ]
 }
 ```
+
+**Status**: Format defined; LLM output parsing not yet implemented (see `utils/llm_engines.py` for where to add parsing)
 
 ### When to Distrust Agent Outputs
 
@@ -270,44 +375,59 @@ These breadcrumbs help retrieval—tune chunking and embedding to capture them.
 
 ## 📚 Knowledge Base Content
 
-Populate knowledge base with:
+**Status**: `data/sample_kb/` is currently empty; need to create 5 KB documents.
 
-**For each failure type:**
-1. **Symptom description** - What users see
-2. **Root cause explanation** - Why it happens
-3. **Log analysis steps** - How to diagnose manually
-4. **Common patterns** - Log patterns to look for
-5. **Remediation steps** - How to fix
-6. **Prevention** - How to avoid in future
+### Required Runbooks
 
-**Example (db_leak)**:
-```
-## Connection Pool Exhaustion
+For each failure type, create a markdown file in `data/sample_kb/`:
 
-### Symptom
-Applications hang waiting for database connection. 
-Error: "Connection not available, request timed out after 30000ms"
+**1. db_leak_runbook.md**
+```markdown
+# Connection Pool Exhaustion (db_leak)
 
-### Root Cause
-Connections not returned to pool. Usually: unclosed statement, exception before close(), 
-or long-running transaction.
+## Symptom
+- Applications hang waiting for database connection
+- Error: "Connection not available, request timed out after 30000ms"
+- HikariCP logs show: "Available connections: 0"
 
-### Log Analysis
-1. Look for: "Available connections: X" entries
+## Root Cause
+Connections not returned to pool. Usually:
+- Unclosed statement or connection
+- Exception before close() in try/finally
+- Long-running transaction
+- Missing try-with-resources
+
+## Log Analysis
+1. Look for: "Available connections: X" entries in HikariCP logs
 2. Track if X drops over time → likely leak
-3. Check which endpoint was active when pool exhausted
-4. Review servlet code for try-finally or try-with-resources
+3. Find which endpoint was active when pool exhausted
+4. Search for error stacktraces in connection handling code
+5. Review servlet code for try-finally or try-with-resources
 
-### Remediation
-1. Restart service (short-term)
-2. Code review for connection handling (long-term)
-3. Add monitoring for available connections < 5
+## Log Signatures
+- "⚠️ Connection leak scenario" (ByteBite marker)
+- "Available connections: 0" (persists across requests)
+- "Connection not available, timeout after 30000ms"
+- "HikariPool.getConnection()" in stacktrace
 
-### Prevention
-- Always use try-with-resources or try-finally
-- Never hold connections longer than necessary
-- Load test to catch leaks before production
+## Remediation
+1. Restart service (immediate)
+2. Code review - find unclosed connection
+3. Add try-with-resources
+4. Monitor for available connections < 5
 ```
+
+**2-5. Similar structure for**:
+- `ldap_timeout_runbook.md` — LDAP errors, timeout patterns
+- `oom_runbook.md` — OutOfMemoryError, heap analysis
+- `deadlock_runbook.md` — Thread dumps, lock cycles
+- `ssl_runbook.md` — Certificate errors, trust store
+
+### Implementation
+1. Create .md files in `data/sample_kb/`
+2. Open Streamlit UI → Knowledge Base tab
+3. Upload all 5 runbooks
+4. Verify in "Indexed Documents" section
 
 ---
 
@@ -333,3 +453,69 @@ You are building the AI expert. Make it one you'd trust in production.
 - **Chapter 13**: End-to-end integration (app failure → agent diagnosis)
 
 See `../log-analysis-book/CLAUDE.md` for how your code is used in teaching.
+
+---
+
+## 🚀 Development Priorities (Next Steps)
+
+### Phase 1: Foundation (Weeks 1-2)
+1. **Populate sample KB** — Create 5 runbooks in `data/sample_kb/` (db_leak, ldap_timeout, oom, deadlock, ssl)
+2. **Build LLM output parser** — Add JSON parsing in `utils/llm_engines.py` with fallback to raw text
+3. **Enhance prompt** — Update prompt in `log_analysis_tab.py` line 168-173 to request structured JSON + confidence
+
+### Phase 2: Testing (Weeks 3-4)
+1. **Create test framework** — Add integration tests against ByteBite failures
+2. **Manual verification** — Run against all 5 failure types; verify accuracy >= targets
+3. **Confidence calibration** — Collect results, measure confidence vs. accuracy
+
+### Phase 3: Optimization (Weeks 5-6)
+1. **Tune retrieval** — Experiment with chunk_size, overlap, similarity_threshold per failure type
+2. **Ablation studies** — Measure impact of KB, web search, log retrieval separately
+3. **Performance profiling** — Ensure diagnosis latency < 10 seconds
+
+---
+
+## 📋 Quick Reference: What Not To Do
+
+**Anti-patterns that violate CLAUDE.md**:
+- ❌ Return confidence 1.0 (100%) — always explain uncertainty
+- ❌ Ignore retrieval quality — tune retrieval before tweaking prompts
+- ❌ Merge features without testing against ByteBite failures
+- ❌ Use generic prompts that don't request evidence or reasoning
+- ❌ Hallucinate if retrieval returns nothing — tell the user instead
+- ❌ Skip knowledge base population — KB quality directly impacts accuracy
+
+---
+
+## 🔧 How to Run Locally
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Start Ollama (or point OLLAMA_URL to remote)
+ollama serve
+
+# 3. Pull recommended models
+ollama pull llama3:latest
+ollama pull nomic-embed-text
+
+# 4. Run Streamlit app
+streamlit run app.py
+
+# 5. Open browser
+# http://localhost:8501
+```
+
+**Environment variables**:
+```bash
+OLLAMA_URL=http://localhost:11434  # Ollama endpoint
+OPENAI_API_KEY=...                 # If using OpenAI
+```
+
+**Or use Docker Compose**:
+```bash
+docker-compose up -d
+# Streamlit: http://localhost:8501
+# Ollama: http://localhost:11434
+```

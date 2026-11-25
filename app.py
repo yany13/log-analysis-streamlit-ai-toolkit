@@ -2,6 +2,14 @@
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# Remote debugger (attach VS Code via port 5678)
+try:
+    import debugpy
+    if not debugpy.is_client_connected():
+        debugpy.listen(("0.0.0.0", 5678))
+except RuntimeError:
+    pass  # already listening from a previous Streamlit rerun
+
 import streamlit as st
 from components.sidebar import render_sidebar
 from components.log_analysis_tab import render_log_analysis_tab
@@ -20,7 +28,7 @@ def initialize_session_state():
 def configure_page():
     """Configure Streamlit page settings."""
     st.set_page_config(
-        page_title="Log Analysis Tool",
+        page_title="LogInsight AI",
         layout="wide",
         page_icon="🕵️"
     )
@@ -57,7 +65,7 @@ def main():
 
     # Main UI
     st.markdown(
-        '<p style="font-size:24px; font-weight:800; color:#007bff;">🕵️ Log Analysis Tool</p>',
+        '<p style="font-size:24px; font-weight:800; color:#007bff;">🕵️ LogInsight AI</p>',
         unsafe_allow_html=True
     )
 

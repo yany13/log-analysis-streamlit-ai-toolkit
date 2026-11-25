@@ -1,0 +1,290 @@
+"""Log Analysis tab component."""
+import re
+import streamlit as st
+from dateutil import parser as date_parser
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from config.settings import (
+    DB_LOGS_PATH, LOGS_COLLECTION, SIMILARITY_THRESHOLD, MAX_SEARCH_RESULTS
+)
+from utils.database import get_vector_store, get_inventory, get_file_list
+from utils.pdf_generator import create_pdf_report
+from utils.search import web_search
+
+
+def extract_timestamp(line):
+    """Extract unix timestamp from log line."""
+    ts_value = 0
+    match = re.search(r'(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', line)
+    if match:
+        try:
+            ts_value = int(date_parser.parse(match.group(0)).timestamp())
+        except Exception:
+            ts_value = 0
+    return ts_value
+
+
+def ingest_logs(uploaded_files, embed_engine, existing_files):
+    """Process and ingest uploaded log files."""
+    new_files = [f for f in uploaded_files if f.name not in existing_files]
+    if not new_files:
+        return
+
+    with st.status("Ingesting logs...") as status:
+        db = get_vector_store(DB_LOGS_PATH, embed_engine, LOGS_COLLECTION)
+
+        for file in new_files:
+            status.write(f"Processing {file.name}...")
+            content = file.read().decode('utf-8', errors='ignore').splitlines()
+
+            batch_texts, batch_metadatas = [], []
+            for line in content:
+                if not line.strip():
+                    continue
+                ts = extract_timestamp(line)
+                batch_texts.append(line)
+                batch_metadatas.append({
+                    "source": file.name,
+                    "unix_ts": int(ts)
+                })
+
+            if batch_texts:
+                db.add_texts(batch_texts, metadatas=batch_metadatas)
+
+        status.update(label="Logs ingested!", state="complete")
+    st.rerun()
+
+
+def render_pattern_analysis(log_file, embed_engine, llm_fn):
+    """Render pattern analysis section."""
+    st.markdown("#### 📊 Pattern Analysis")
+    pattern_query = st.text_input(
+        "Pattern (e.g. ERROR):",
+        key="pattern_input"
+    )
+
+    if pattern_query and log_file:
+        db = get_vector_store(DB_LOGS_PATH, embed_engine, LOGS_COLLECTION)
+        results = db._collection.get(
+            where={"source": log_file},
+            where_document={"$contains": pattern_query}
+        )
+        hits = results.get('documents', [])
+
+        st.metric("Total Hits", len(hits))
+
+        if hits and st.button("High level Analysis 🤖", use_container_width=True):
+            with st.status("Analyzing pattern hits..."):
+                summary = llm_fn(
+                    f"Expert summary of log hits in {log_file}: {hits[:20]}"
+                ).content
+                st.info(summary)
+
+
+def render_context_explorer(log_file, embed_engine):
+    """Render context explorer section."""
+    st.markdown("#### 🔍 Context Explorer")
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        context_query = st.text_input("Query details:", key="context_input")
+    with col2:
+        record_limit = st.number_input("Records", 1, 10, 1)
+
+    if context_query and log_file:
+        db = get_vector_store(DB_LOGS_PATH, embed_engine, LOGS_COLLECTION)
+
+        # Try exact match first
+        exact = db._collection.get(
+            where={"source": log_file},
+            where_document={"$contains": context_query},
+            limit=record_limit
+        )
+
+        if exact.get('documents'):
+            for doc in exact['documents']:
+                st.markdown(
+                    f'<div style="background:#1e1e1e; color:#4caf50; padding:6px; '
+                    f'border-radius:4px; font-size:11px; margin-bottom:4px; '
+                    f'border-left:3px solid #4caf50;">{doc}</div>',
+                    unsafe_allow_html=True
+                )
+        else:
+            # Fall back to semantic search
+            semantic = db.similarity_search_with_relevance_scores(
+                context_query,
+                k=record_limit,
+                filter={"source": log_file}
+            )
+            for doc, score in semantic:
+                if score > SIMILARITY_THRESHOLD:
+                    st.markdown(
+                        f'<div style="background:#1e1e1e; color:#d4d4d4; padding:6px; '
+                        f'border-radius:4px; font-size:11px; margin-bottom:4px; '
+                        f'border-left:3px solid #007bff;">{doc.page_content}</div>',
+                        unsafe_allow_html=True
+                    )
+
+
+def render_rca_section(embed_engine, expert_llm_fn):
+    """Render Root Cause Analysis section."""
+    with st.expander("🧠 Expert Root Cause Analysis", expanded=True):
+        incident_query = st.text_input(
+            "Describe the incident for Hybrid correlation:"
+        )
+        debug_mode = st.checkbox("🐛 Debug Mode (show retrieved contexts & raw LLM output)")
+
+        if st.button("🚀 Run Comprehensive RCA") and incident_query:
+            with st.status("🔍 Orchestrating Hybrid RCA...") as status:
+                # Search logs
+                status.write("Searching log history...")
+                db_logs = get_vector_store(
+                    DB_LOGS_PATH,
+                    embed_engine,
+                    LOGS_COLLECTION
+                )
+                log_results = db_logs.similarity_search(incident_query, k=MAX_SEARCH_RESULTS)
+                log_context = "\n".join([
+                    f"[{h.metadata.get('source')}] {h.page_content}"
+                    for h in log_results
+                ])
+
+                # Search knowledge base
+                status.write("Consulting Knowledge Base...")
+                from config.settings import DB_KB_PATH, KB_COLLECTION
+                db_kb = get_vector_store(
+                    DB_KB_PATH,
+                    embed_engine,
+                    KB_COLLECTION
+                )
+                kb_results = db_kb.similarity_search(incident_query, k=3)
+                kb_context = "\n".join([h.page_content for h in kb_results])
+
+                # Web search
+                status.write("Searching Web (DuckDuckGo) for external context...")
+                web_context = web_search(incident_query)
+
+                # Build structured prompt
+                status.write("Generating Expert Insights...")
+                prompt = f"""You are an expert Site Reliability Engineer performing Root Cause Analysis.
+
+INCIDENT QUERY: {incident_query}
+
+LOG EVIDENCE (most relevant log lines):
+{log_context if log_context else "No logs retrieved."}
+
+KNOWLEDGE BASE (runbooks & known patterns):
+{kb_context if kb_context else "No knowledge base entries found."}
+
+EXTERNAL CONTEXT (web search):
+{web_context if web_context else "No web search results."}
+
+INSTRUCTIONS:
+1. Identify symptoms: which log lines indicate a problem?
+2. Form a hypothesis: which failure type matches?
+3. Rate confidence 0-100%:
+   - 90-100%: Clear distinctive error messages
+   - 70-89%: Strong indicators, minor ambiguity
+   - 50-69%: Multiple plausible causes
+   - <50%: Insufficient evidence
+4. List specific evidence (quote exact log lines)
+5. Explain uncertainty
+6. Provide remediation steps
+
+ROOT CAUSE ANALYSIS:"""
+
+                raw_response = expert_llm_fn(prompt)
+                rca_content = raw_response.content if hasattr(raw_response, 'content') else str(raw_response)
+
+                st.session_state.last_rca = rca_content
+                st.session_state.last_rca_query = incident_query
+                st.session_state.debug_contexts = {
+                    "log_hits": len(log_results),
+                    "log_context": log_context,
+                    "kb_hits": len(kb_results),
+                    "kb_context": kb_context,
+                    "web_context": web_context,
+                    "prompt": prompt,
+                    "raw_response": rca_content,
+                }
+                status.update(label="Hybrid RCA Complete!", state="complete")
+
+        # Debug panel
+        if debug_mode and st.session_state.get('debug_contexts'):
+            dbg = st.session_state.debug_contexts
+            st.markdown("---")
+            st.markdown("### 🐛 Debug: Pipeline Inspection")
+
+            col_l, col_k = st.columns(2)
+            with col_l:
+                st.metric("Log chunks retrieved", dbg["log_hits"])
+            with col_k:
+                st.metric("KB chunks retrieved", dbg["kb_hits"])
+
+            with st.expander(f"📄 Log Context ({dbg['log_hits']} hits)", expanded=dbg["log_hits"] == 0):
+                if dbg["log_context"]:
+                    st.code(dbg["log_context"], language="text")
+                else:
+                    st.error("⚠️ No log context retrieved! Check that logs are ingested and query matches.")
+
+            with st.expander(f"📚 KB Context ({dbg['kb_hits']} hits)", expanded=dbg["kb_hits"] == 0):
+                if dbg["kb_context"]:
+                    st.code(dbg["kb_context"], language="text")
+                else:
+                    st.error("⚠️ No KB context! Upload runbooks in the Knowledge Base tab.")
+
+            with st.expander("🌐 Web Search Result"):
+                st.code(dbg["web_context"] or "Empty", language="text")
+
+            with st.expander("📝 Full Prompt Sent to LLM"):
+                st.code(dbg["prompt"], language="text")
+
+            with st.expander("🤖 Raw LLM Response"):
+                st.code(dbg["raw_response"], language="text")
+
+            st.markdown("---")
+
+        # Display and export RCA
+        if st.session_state.get('last_rca'):
+            st.markdown(st.session_state.last_rca)
+            saved_query = st.session_state.get('last_rca_query', incident_query or "RCA")
+            pdf_data = create_pdf_report(st.session_state.last_rca, saved_query)
+            st.download_button(
+                "📥 PDF Export",
+                data=pdf_data,
+                file_name="RCA_Report.pdf"
+            )
+
+
+def render_log_analysis_tab(embed_engine, expert_llm_fn, summary_llm_fn):
+    """Render main log analysis tab."""
+    st.markdown("### 📄 Log Analysis")
+
+    # Get existing logs
+    logs_inventory = get_inventory(DB_LOGS_PATH, LOGS_COLLECTION)
+    log_files = get_file_list(logs_inventory)
+
+    # File uploader
+    uploaded_logs = st.file_uploader(
+        "Upload Logs",
+        accept_multiple_files=True,
+        label_visibility="collapsed"
+    )
+
+    if uploaded_logs:
+        ingest_logs(uploaded_logs, embed_engine, log_files)
+
+    # Analysis sections
+    if log_files:
+        selected_file = st.selectbox("📂 Investigation File", log_files)
+
+        col1, col2 = st.columns([1, 2])
+
+        with col1:
+            render_pattern_analysis(selected_file, embed_engine, summary_llm_fn)
+
+        with col2:
+            render_context_explorer(selected_file, embed_engine)
+
+        st.divider()
+
+    render_rca_section(embed_engine, expert_llm_fn)
